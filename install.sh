@@ -21,10 +21,17 @@ echo -e "${CYAN}            Latiseducation & Tutorindonesia (SB Admin 2)        
 echo -e "${BLUE}======================================================================${NC}"
 echo ""
 
+# Pastikan environment variable HOME & COMPOSER selalu terdefinisi
+export HOME="${HOME:-/root}"
+export COMPOSER_HOME="${COMPOSER_HOME:-/root/.composer}"
+export COMPOSER_ALLOW_SUPERUSER=1
+mkdir -p "$COMPOSER_HOME"
+chmod -R 777 "$COMPOSER_HOME" 2>/dev/null || true
+
 # Deteksi hak akses root / sudo
 if [ "$EUID" -ne 0 ]; then
     if command -v sudo &> /dev/null; then
-        SUDO="sudo"
+        SUDO="sudo -E"
     else
         echo -e "${RED}[ERROR] Script memerlukan hak akses root atau sudo!${NC}"
         exit 1
@@ -34,6 +41,16 @@ else
 fi
 
 export DEBIAN_FRONTEND=noninteractive
+
+# Wrapper composer dengan variabel environment lengkap
+run_composer() {
+    $SUDO env HOME="${HOME:-/root}" COMPOSER_HOME="${COMPOSER_HOME:-/root/.composer}" COMPOSER_ALLOW_SUPERUSER=1 composer "$@"
+}
+
+# Wrapper artisan dengan variabel environment lengkap
+run_artisan() {
+    $SUDO env HOME="${HOME:-/root}" php artisan "$@"
+}
 
 # 1. Update Repository & Install Prerequisite Dasar
 echo -e "${YELLOW}[1/7] Memeriksa dan memperbarui paket sistem dasar...${NC}"
@@ -85,9 +102,8 @@ if ! command -v composer &> /dev/null; then
     $SUDO chmod +x /usr/local/bin/composer
 fi
 
-echo -e "Composer aktif: ${GREEN}$(composer --version)${NC}"
-export COMPOSER_ALLOW_SUPERUSER=1
-composer config --global policy.advisories.block false || true
+echo -e "Composer aktif: ${GREEN}$(run_composer --version)${NC}"
+run_composer config --global policy.advisories.block false || true
 
 # 4. Setup Database MySQL / MariaDB
 echo -e "${YELLOW}[4/7] Mengonfigurasi database MariaDB/MySQL...${NC}"
@@ -141,23 +157,23 @@ $SUDO sed -i 's/FILESYSTEM_DISK=.*/FILESYSTEM_DISK=public/' "$APP_DIR/.env"
 
 # 6. Jalankan Composer, Migrasi Database, & Optimasi
 echo -e "${YELLOW}[6/7] Menjalankan composer install, migrasi & seeder...${NC}"
-$SUDO composer install --no-interaction --prefer-dist --optimize-autoloader
+run_composer install --no-interaction --prefer-dist --optimize-autoloader
 
 # Generate APP_KEY jika belum ada
 if ! grep -q "APP_KEY=base64:" "$APP_DIR/.env"; then
-    $SUDO php artisan key:generate --force
+    run_artisan key:generate --force
 fi
 
-$SUDO php artisan storage:link --force || true
+run_artisan storage:link --force || true
 
 # Jalankan migrasi dan seeder
-$SUDO php artisan migrate --force
-$SUDO php artisan db:seed --force
+run_artisan migrate --force
+run_artisan db:seed --force
 
-$SUDO php artisan optimize:clear || true
-$SUDO php artisan config:cache || true
-$SUDO php artisan route:cache || true
-$SUDO php artisan view:cache || true
+run_artisan optimize:clear || true
+run_artisan config:cache || true
+run_artisan route:cache || true
+run_artisan view:cache || true
 
 # 7. Konfigurasi Nginx Web Server
 echo -e "${YELLOW}[7/7] Mengonfigurasi Nginx Web Server...${NC}"
