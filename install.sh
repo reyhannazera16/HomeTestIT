@@ -158,6 +158,11 @@ $SUDO sed -i 's/DB_USERNAME=.*/DB_USERNAME=root/' "$APP_DIR/.env"
 $SUDO sed -i 's/DB_PASSWORD=.*/DB_PASSWORD=/' "$APP_DIR/.env"
 $SUDO sed -i 's/SESSION_DRIVER=.*/SESSION_DRIVER=file/' "$APP_DIR/.env"
 $SUDO sed -i 's/FILESYSTEM_DISK=.*/FILESYSTEM_DISK=public/' "$APP_DIR/.env"
+if ! grep -q "DB_COLLATION=" "$APP_DIR/.env"; then
+    echo "DB_COLLATION=utf8mb4_unicode_ci" | $SUDO tee -a "$APP_DIR/.env" > /dev/null
+else
+    $SUDO sed -i 's/DB_COLLATION=.*/DB_COLLATION=utf8mb4_unicode_ci/' "$APP_DIR/.env"
+fi
 
 # Siapkan direktori storage & permissions awal agar composer dan artisan dapat menulis cache
 $SUDO mkdir -p "$APP_DIR/storage/framework/cache/data" \
