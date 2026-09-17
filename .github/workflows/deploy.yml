@@ -1,0 +1,24 @@
+name: CI/CD Auto-Deploy to Proxmox CT
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Auto Install & Deploy Laravel on Proxmox CT
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Run Auto-Installation and Deployment
+        run: |
+          chmod +x ./install.sh
+          if [ "$EUID" -ne 0 ]; then
+            sudo -n bash ./install.sh || sudo bash ./install.sh || bash ./install.sh
+          else
+            bash ./install.sh
+          fi
