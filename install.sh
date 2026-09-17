@@ -13,6 +13,7 @@ GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
+BOLD='\033[1m'
 NC='\033[0m'
 
 echo -e "${BLUE}======================================================================${NC}"
@@ -110,9 +111,14 @@ echo -e "${YELLOW}[4/7] Mengonfigurasi database MariaDB/MySQL...${NC}"
 $SUDO systemctl start mariadb || $SUDO service mariadb start || true
 $SUDO systemctl enable mariadb || $SUDO service mariadb enable || true
 
-# Pastikan database ada
+# Pastikan database ada dan izin akses root via TCP 127.0.0.1 terbuka
 $SUDO mysql -e "CREATE DATABASE IF NOT EXISTS student_management CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-$SUDO mysql -e "GRANT ALL PRIVILEGES ON student_management.* TO 'root'@'localhost' IDENTIFIED VIA mysql_native_password;" || true
+$SUDO mysql -e "CREATE USER IF NOT EXISTS 'root'@'127.0.0.1' IDENTIFIED BY '';" || true
+$SUDO mysql -e "ALTER USER 'root'@'127.0.0.1' IDENTIFIED BY '';" || true
+$SUDO mysql -e "GRANT ALL PRIVILEGES ON *.* TO 'root'@'127.0.0.1' WITH GRANT OPTION;" || true
+$SUDO mysql -e "CREATE USER IF NOT EXISTS 'root'@'localhost' IDENTIFIED BY '';" || true
+$SUDO mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '';" || true
+$SUDO mysql -e "GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost' WITH GRANT OPTION;" || true
 $SUDO mysql -e "FLUSH PRIVILEGES;" || true
 
 # 5. Sinkronisasi Source Code ke /var/www/student_management
@@ -128,10 +134,8 @@ CURRENT_DIR=$(pwd)
 $SUDO mkdir -p "$APP_DIR"
 
 if [ -f "$CURRENT_DIR/artisan" ] && [ -f "$CURRENT_DIR/composer.json" ]; then
-    # Jika dijalankan dari runner workspace
     $SUDO cp -r "$CURRENT_DIR/." "$APP_DIR/"
 else
-    # Jika dijalankan via curl langsung
     $SUDO rm -rf "$APP_DIR"
     $SUDO git clone https://github.com/reyhannazera16/HomeTestIT.git "$APP_DIR"
 fi
@@ -154,6 +158,14 @@ $SUDO sed -i 's/DB_USERNAME=.*/DB_USERNAME=root/' "$APP_DIR/.env"
 $SUDO sed -i 's/DB_PASSWORD=.*/DB_PASSWORD=/' "$APP_DIR/.env"
 $SUDO sed -i 's/SESSION_DRIVER=.*/SESSION_DRIVER=file/' "$APP_DIR/.env"
 $SUDO sed -i 's/FILESYSTEM_DISK=.*/FILESYSTEM_DISK=public/' "$APP_DIR/.env"
+
+# Siapkan direktori storage & permissions awal agar composer dan artisan dapat menulis cache
+$SUDO mkdir -p "$APP_DIR/storage/framework/cache/data" \
+               "$APP_DIR/storage/framework/sessions" \
+               "$APP_DIR/storage/framework/views" \
+               "$APP_DIR/storage/logs" \
+               "$APP_DIR/bootstrap/cache"
+$SUDO chmod -R 777 "$APP_DIR/storage" "$APP_DIR/bootstrap/cache"
 
 # 6. Jalankan Composer, Migrasi Database, & Optimasi
 echo -e "${YELLOW}[6/7] Menjalankan composer install, migrasi & seeder...${NC}"
@@ -227,7 +239,7 @@ EOF"
 
 $SUDO ln -sf /etc/nginx/sites-available/student_management /etc/nginx/sites-enabled/
 
-# Hak akses www-data
+# Hak akses final www-data
 $SUDO chown -R www-data:www-data "$APP_DIR"
 $SUDO chmod -R 775 "$APP_DIR/storage" "$APP_DIR/bootstrap/cache"
 
@@ -246,7 +258,7 @@ echo -e "${GREEN}  ✔ AUTO-DEPLOY SUKSES! APLIKASI TELAH AKTIF DI PROXMOX CT   
 echo -e "${GREEN}======================================================================${NC}"
 echo ""
 echo -e "Aplikasi siap diakses melalui browser:"
-echo -e "🌐 ${CYAN}http://${IP_ADDRESS}${NC}"
+echo -e "🌐 ${CYAN}${BOLD}http://${IP_ADDRESS}${NC}"
 echo ""
 echo -e "🔑 ${YELLOW}Kredensial Login Administrator:${NC}"
 echo -e "   Email    : ${GREEN}admin@latis.com${NC}"
